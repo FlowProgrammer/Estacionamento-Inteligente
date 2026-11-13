@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmartPark IoT</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    .popup h3 { margin: 0 0 6px; }
+    .popup p { margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const map = L.map("map").setView([-23.555, -46.645], 13);
+
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // textContent evita injeção de HTML vinda do banco
+    function addLine(parent, text) {
+      const p = document.createElement("p");
+      p.textContent = text;
+      parent.appendChild(p);
+    }
+
+    function buildPopup(lot) {
+      const box = document.createElement("div");
+      box.className = "popup";
+      const h = document.createElement("h3");
+      h.textContent = lot.name;
+      box.appendChild(h);
+      addLine(box, lot.address);
+      addLine(box, "Tarifa: " + Number(lot.hourlyRate).toLocaleString("pt-BR",
+        { style: "currency", currency: "BRL" }) + "/hora");
+      if (lot.openingHours) addLine(box, "Horário: " + lot.openingHours);
+      return box;
+    }
+
+    async function loadLots() {
+      try {
+        const res = await fetch("/api/parking-lots");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const lots = await res.json();
+
+        const bounds = [];
+        lots.forEach(lot => {
+          if (typeof lot.latitude !== "number" || typeof lot.longitude !== "number") return;
+          const pos = [lot.latitude, lot.longitude];
+          L.marker(pos).addTo(map).bindPopup(buildPopup(lot));
+          bounds.push(pos);
+        });
+        if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
+      } catch (e) {
+        alert("Não foi possível carregar os estacionamentos.");
+      }
+    }
+
+    loadLots();
+  </script>
+</body>
+</html>
